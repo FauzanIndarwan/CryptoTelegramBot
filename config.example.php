@@ -62,7 +62,7 @@ return [
     // Market Monitoring
     'monitoring' => [
         'price_change_threshold' => 5.0, // Percentage change for moon/crash alerts
-        'stochrsI_period' => 14,
+        'stochrsi_period' => 14,
         'stochrsi_smooth_k' => 3,
         'stochrsi_smooth_d' => 3,
     ],

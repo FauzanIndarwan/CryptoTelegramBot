@@ -3,8 +3,11 @@
  * Stochastic RSI Checker
  * 
  * Checks StochRSI values for monitored pairs and sends alerts for significant signals.
- * Run this script via cron every 4 hours: 0 star/4 * * * php /path/to/cek_stoch_rsi.php
- * (replace "star" with asterisk symbol)
+ * Run this script via cron every 4 hours.
+ * 
+ * Crontab entry example:
+ * 0 *\/4 * * * php /path/to/cek_stoch_rsi.php
+ * (Remove the backslash before the forward slash when adding to crontab)
  */
 
 // Error reporting

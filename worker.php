@@ -27,15 +27,15 @@ $telegram = new TelegramHelper();
 $binance = new BinanceAPI();
 $db = Database::getInstance();
 
-// Get batch size from config
-$batchSize = $config['worker']['batch_size'];
+// Get batch size from config (ensure it's an integer)
+$batchSize = (int)$config['worker']['batch_size'];
 
 // Fetch pending jobs
 $result = $db->query(
     "SELECT * FROM bot_job_queue 
      WHERE status = 'pending' 
      ORDER BY created_at ASC 
-     LIMIT $batchSize"
+     LIMIT " . $batchSize
 );
 
 if (!$result) {
@@ -267,8 +267,20 @@ function savePrice($binance, $symbol, $price, $high, $low) {
     // Sanitize symbol - only allow alphanumeric characters
     $sanitizedSymbol = preg_replace('/[^A-Za-z0-9]/', '', $symbol);
     
+    // Validate that symbol ends with USDT (expected format)
+    if (substr($sanitizedSymbol, -4) !== 'USDT') {
+        error_log("Invalid symbol format: $symbol");
+        return;
+    }
+    
     // Create table name from symbol (e.g., BTCUSDT -> riwayat_btc_usdt)
     $tableName = 'riwayat_' . strtolower(str_replace('USDT', '_usdt', $sanitizedSymbol));
+    
+    // Additional validation: ensure table name matches expected pattern
+    if (!preg_match('/^riwayat_[a-z0-9]+_usdt$/', $tableName)) {
+        error_log("Invalid table name generated: $tableName");
+        return;
+    }
     
     // Create table if not exists
     $createTableQuery = "CREATE TABLE IF NOT EXISTS `$tableName` (

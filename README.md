@@ -21,7 +21,7 @@
 | 📈 **Line Chart** | Visualisasi pergerakan harga per 5 menit |
 | 🕯️ **Candlestick Chart** | Chart harian dengan data OHLC (30 hari) |
 | 📉 **Stochastic RSI** | Indikator teknikal untuk analisis oversold/overbought |
-| 🚀 **Moon/Crash Alert** | Notifikasi otomatis saat terjadi pergerakan signifkan (>5%) |
+| 🚀 **Moon/Crash Alert** | Notifikasi otomatis saat terjadi pergerakan signifikan (>5%) |
 | ⏰ **Auto Notification** | Sinyal sentimen pasar dari monitoring cron |
 
 ---
