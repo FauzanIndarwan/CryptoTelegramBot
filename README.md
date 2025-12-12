@@ -4,11 +4,11 @@
   <img src="https://img.shields.io/badge/PHP-8.0+-777BB4? style=for-the-badge&logo=php&logoColor=white" alt="PHP Version">
   <img src="https://img.shields.io/badge/MySQL-5.7+-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL">
   <img src="https://img.shields.io/badge/Telegram-Bot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Bot">
-  <img src="https://img.shields.io/badge/Indodax-API-00D4AA?style=for-the-badge" alt="Indodax API">
+  <img src="https://img.shields.io/badge/Binance-API-F3BA2F?style=for-the-badge&logo=binance&logoColor=white" alt="Binance API">
 </p>
 
 <p align="center">
-  <b>Bot Telegram untuk monitoring harga cryptocurrency dari Indodax dengan fitur analisis teknikal otomatis</b>
+  <b>Bot Telegram untuk monitoring harga cryptocurrency dari Binance dengan fitur analisis teknikal otomatis</b>
 </p>
 
 ---
@@ -17,12 +17,12 @@
 
 | Fitur | Deskripsi |
 |-------|-----------|
-| 📊 **Real-time Price** | Pantau harga crypto real-time dari Indodax |
+| 📊 **Real-time Price** | Pantau harga crypto real-time dari Binance |
 | 📈 **Line Chart** | Visualisasi pergerakan harga per 5 menit |
-| 🕯️ **Candlestick Chart** | Chart harian dengan data OHLC |
+| 🕯️ **Candlestick Chart** | Chart harian dengan data OHLC (30 hari) |
 | 📉 **Stochastic RSI** | Indikator teknikal untuk analisis oversold/overbought |
-| 🚀 **Moon/Crash Alert** | Notifikasi otomatis saat terjadi pergerakan signifikan |
-| ⏰ **Auto Notification** | Sinyal sentimen pasar setiap 5 menit |
+| 🚀 **Moon/Crash Alert** | Notifikasi otomatis saat terjadi pergerakan signifkan (>5%) |
+| ⏰ **Auto Notification** | Sinyal sentimen pasar dari monitoring cron |
 
 ---
 
@@ -43,15 +43,25 @@ cd CryptoTelegramBot
 ```
 
 2. **Setup Database**
-```sql
-CREATE DATABASE crypto_bot;
+```bash
+mysql -u root -p < setup_database.sql
+# Or manually:
+# CREATE DATABASE crypto_bot;
+# Then import setup_database.sql
 ```
 
 3. **Konfigurasi**
 ```bash
 cp config.example.php config.php
 # Edit config.php dengan kredensial Anda
+nano config.php
 ```
+
+**Configure the following:**
+- `telegram.bot_token` - Your Telegram bot token from @BotFather
+- `telegram.chat_id_notifikasi` - Your chat ID for notifications
+- `database.*` - MySQL database credentials
+- `cron.secret_key` - Secret key for cron job security
 
 4. **Setup Webhook Telegram**
 ```
@@ -80,11 +90,13 @@ https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook?url=https://yourdomain.com/b
 | Perintah | Contoh | Deskripsi |
 |----------|--------|-----------|
 | `/start` | `/start` | Memulai bot dan melihat daftar perintah |
-| `/harga` | `/harga btc idr` | Cek harga terkini suatu pair |
-| `/chart` | `/chart eth idr` | Line chart pergerakan 1 jam terakhir |
-| `/chartdaily` | `/chartdaily btc idr` | Candlestick chart 30 hari |
-| `/indicator` | `/indicator btc idr` | Analisis Stochastic RSI |
+| `/harga` | `/harga BTC USDT` | Cek harga terkini suatu pair |
+| `/chart` | `/chart ETH USDT` | Line chart pergerakan 1 jam terakhir |
+| `/chartdaily` | `/chartdaily BTC USDT` | Candlestick chart 30 hari |
+| `/indicator` | `/indicator BTC USDT` | Analisis Stochastic RSI |
 | `/stop` | `/stop` | Batalkan semua pekerjaan dalam antrian |
+
+**Note:** All trading pairs use USDT as the quote currency (e.g., BTC/USDT, ETH/USDT). This is different from the previous version which used IDR.
 
 ---
 
@@ -137,25 +149,21 @@ CryptoTelegramBot/
 │
 ├── 📄 bot.php                  # Entry point utama & Telegram webhook handler
 ├── 📄 worker.php               # Background job processor untuk antrian
-├── 📄 ambil_data_historis.php  # Cron:  Pengambil data OHLC harian
-├── 📄 cek_stoch_rsi.php        # Cron:  Pengecekan sinyal StochRSI
+├── 📄 ambil_data_historis.php  # Cron: Pengambil data OHLC harian
+├── 📄 cek_stoch_rsi.php        # Cron: Pengecekan sinyal StochRSI
 │
 ├── ⚙️ config.php               # Konfigurasi (jangan di-commit!)
 ├── ⚙️ config.example.php       # Template konfigurasi
+├── 📄 setup_database.sql       # Database schema setup
 │
 ├── 🔧 Core Classes
 │   ├── Database.php            # Database singleton dengan connection pooling
 │   ├── TelegramHelper.php      # Telegram API helper dengan reusable cURL
-│   ├── IndodaxAPI.php          # Indodax API wrapper dengan caching
-│   ├── Indicators.php          # Kalkulasi indikator teknikal
-│   └── ChartGenerator.php      # Generator URL chart
+│   ├── BinanceAPI.php          # Binance API wrapper dengan caching dan retry
+│   ├── Indicators.php          # Kalkulasi indikator teknikal (RSI, StochRSI)
+│   └── ChartGenerator.php      # Generator URL chart menggunakan QuickChart
 │
-├── 🌐 Web Dashboard
-│   ├── index.php               # Interactive chart dashboard
-│   ├── get_symbols.php         # API:  Daftar simbol
-│   └── get_chart_data.php      # API: Data chart
-│
-└── 📄 . gitignore               # File yang diabaikan Git
+└── 📄 .gitignore               # File yang diabaikan Git
 ```
 
 ---
@@ -249,17 +257,26 @@ export CRON_KEY="your_secret_key"
 
 ## 📝 Changelog
 
+### v3.0.0 (2025) - Binance API Migration
+- 🔄 **BREAKING:** Migrated from Indodax API to Binance API
+- 🔄 **BREAKING:** Changed from IDR pairs to USDT pairs
+- ✅ Refactored to full object-oriented architecture
+- ✅ Added BinanceAPI wrapper class with caching and retry logic
+- ✅ Implemented comprehensive technical indicators (RSI, StochRSI)
+- ✅ Added ChartGenerator for QuickChart integration
+- ✅ Improved database connection with singleton pattern
+- ✅ Batch processing for job queue (5 jobs per batch)
+- ✅ Enhanced security with environment variables support
+- ✅ Added comprehensive error handling and logging
+- ✅ Created modular, maintainable code structure
+
 ### v2.0.0 (2024)
-- ✅ Refactoring ke arsitektur OOP
-- ✅ Implementasi Singleton pattern untuk database
-- ✅ Penambahan caching pada API calls
-- ✅ Retry logic dengan exponential backoff
-- ✅ Improved error handling
-- ✅ Support environment variables
-- ✅ Batch processing untuk job queue
+- ✅ Initial OOP refactoring
+- ✅ Basic caching implementation
+- ✅ Support for environment variables
 
 ### v1.0.0
-- 🎉 Initial release
+- 🎉 Initial release with Indodax API
 - 📊 Basic price monitoring
 - 📈 Chart generation
 - 🔔 Moon/Crash notifications

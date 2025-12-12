@@ -1,0 +1,48 @@
+# Configuration files with sensitive data
+config.php
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Composer dependencies
+/vendor/
+
+# Node modules (if any frontend tooling is added)
+node_modules/
+
+# Database files
+*.sql
+*.sqlite
+*.db
+
+# Backup files
+*.bak
+*.backup
+
+# Cache files
+cache/
+*.cache
+
+# OS generated files
+Thumbs.db
+.DS_Store
+desktop.ini
