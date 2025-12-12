@@ -31,6 +31,7 @@ node_modules/
 
 # Database files
 *.sql
+!setup_database.sql
 *.sqlite
 *.db
 
