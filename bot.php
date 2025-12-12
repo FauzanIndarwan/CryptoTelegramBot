@@ -29,7 +29,7 @@ $db = Database::getInstance();
 /**
  * Handle cron job requests for market sentiment monitoring
  */
-if (isset($_GET['cron']) && $_GET['cron'] === $config['cron']['secret_key']) {
+if (isset($_GET['cron']) && hash_equals($config['cron']['secret_key'], $_GET['cron'])) {
     handleCronJob($telegram, $binance, $db, $config);
     exit;
 }
@@ -52,7 +52,8 @@ $callbackQuery = $update['callback_query'] ?? null;
 if ($message) {
     $chatId = $message['chat']['id'];
     $text = $message['text'] ?? '';
-    $userName = $message['from']['first_name'] ?? 'User';
+    // Sanitize userName to prevent Markdown injection
+    $userName = preg_replace('/[*_`\[\]]/', '', $message['from']['first_name'] ?? 'User');
 
     // Parse command
     $parts = explode(' ', trim($text));

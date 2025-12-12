@@ -264,8 +264,11 @@ function processIndicator($telegram, $binance, $db, $job) {
 function savePrice($binance, $symbol, $price, $high, $low) {
     global $db;
     
+    // Sanitize symbol - only allow alphanumeric characters
+    $sanitizedSymbol = preg_replace('/[^A-Za-z0-9]/', '', $symbol);
+    
     // Create table name from symbol (e.g., BTCUSDT -> riwayat_btc_usdt)
-    $tableName = 'riwayat_' . strtolower(str_replace('USDT', '_usdt', $symbol));
+    $tableName = 'riwayat_' . strtolower(str_replace('USDT', '_usdt', $sanitizedSymbol));
     
     // Create table if not exists
     $createTableQuery = "CREATE TABLE IF NOT EXISTS `$tableName` (

@@ -205,6 +205,10 @@ class BinanceAPI {
      * @return string
      */
     public static function formatSymbol($base, $quote) {
+        // Sanitize inputs - only allow alphanumeric characters
+        $base = preg_replace('/[^A-Za-z0-9]/', '', $base);
+        $quote = preg_replace('/[^A-Za-z0-9]/', '', $quote);
+        
         return strtoupper($base) . strtoupper($quote);
     }
 
