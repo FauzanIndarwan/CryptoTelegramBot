@@ -71,10 +71,21 @@ class Indicators {
      * @return array Array with 'k' and 'd' values
      */
     public static function calculateStochRSI($prices, $rsiPeriod = 14, $stochPeriod = 14, $smoothK = 3, $smoothD = 3) {
+        // Validasi data
+        $minRequired = $rsiPeriod * 2;
+        if (count($prices) < $minRequired) {
+            error_log("StochRSI: Data tidak cukup, butuh min {$minRequired} data, tersedia " . count($prices));
+            return ['k' => [], 'd' => []];
+        }
+        
+        // Konversi ke float
+        $prices = array_map('floatval', $prices);
+        
         // Calculate RSI first
         $rsiValues = self::calculateRSI($prices, $rsiPeriod);
         
         if (count($rsiValues) < $stochPeriod) {
+            error_log("StochRSI: RSI history tidak cukup, butuh {$stochPeriod}, tersedia " . count($rsiValues));
             return ['k' => [], 'd' => []];
         }
 
@@ -89,7 +100,7 @@ class Indicators {
             if ($maxRSI - $minRSI != 0) {
                 $stochRSI[] = (($rsiValues[$i] - $minRSI) / ($maxRSI - $minRSI)) * 100;
             } else {
-                $stochRSI[] = 0;
+                $stochRSI[] = 100.0;
             }
         }
 
@@ -221,45 +232,45 @@ class Indicators {
      * @return array Sentiment information
      */
     public static function getMarketSentiment($count, $isMoon = true) {
-        $levels = [
-            ['threshold' => 121, 'name' => 'Diamond', 'level' => '', 'emoji' => '💎'],
-            ['threshold' => 111, 'name' => 'Golden', 'level' => '2', 'emoji' => '🥇'],
-            ['threshold' => 101, 'name' => 'Golden', 'level' => '1', 'emoji' => '🥇'],
-            ['threshold' => 91, 'name' => 'Ultra', 'level' => '2', 'emoji' => '🔥'],
-            ['threshold' => 81, 'name' => 'Ultra', 'level' => '1', 'emoji' => '🔥'],
-            ['threshold' => 71, 'name' => 'Mega', 'level' => '2', 'emoji' => '⚡'],
-            ['threshold' => 61, 'name' => 'Mega', 'level' => '1', 'emoji' => '⚡'],
-            ['threshold' => 51, 'name' => 'Super', 'level' => '2', 'emoji' => '🌟'],
-            ['threshold' => 41, 'name' => 'Super', 'level' => '1', 'emoji' => '🌟'],
-        ];
-
-        if ($isMoon) {
-            $levels = array_merge($levels, [
-                ['threshold' => 31, 'name' => 'Moon', 'level' => '2', 'emoji' => '🌙'],
-                ['threshold' => 21, 'name' => 'Moon', 'level' => '1', 'emoji' => '🌙'],
-                ['threshold' => 11, 'name' => 'Go Moon', 'level' => '2', 'emoji' => '🚀'],
-                ['threshold' => 1, 'name' => 'Go Moon', 'level' => '1', 'emoji' => '🚀'],
-            ]);
-        } else {
-            $levels = array_merge($levels, [
-                ['threshold' => 31, 'name' => 'Crash', 'level' => '2', 'emoji' => '📉'],
-                ['threshold' => 21, 'name' => 'Crash', 'level' => '1', 'emoji' => '📉'],
-                ['threshold' => 11, 'name' => 'Go Crash', 'level' => '2', 'emoji' => '🔻'],
-                ['threshold' => 1, 'name' => 'Go Crash', 'level' => '1', 'emoji' => '🔻'],
-            ]);
+        if ($count == 0) {
+            return [
+                'count' => 0,
+                'name' => 'Neutral',
+                'level' => '',
+                'emoji' => '⚪',
+                'type' => 'Equal',
+                'full_name' => 'Equal'
+            ];
         }
+        
+        $suffix = $isMoon ? 'Moon' : 'Crash';
+        
+        $levels = [
+            ['threshold' => 121, 'name' => "Diamond {$suffix}"],
+            ['threshold' => 111, 'name' => "Golden {$suffix} 2"],
+            ['threshold' => 101, 'name' => "Golden {$suffix} 1"],
+            ['threshold' => 91, 'name' => "Ultra {$suffix} 2"],
+            ['threshold' => 81, 'name' => "Ultra {$suffix} 1"],
+            ['threshold' => 71, 'name' => "Mega {$suffix} 2"],
+            ['threshold' => 61, 'name' => "Mega {$suffix} 1"],
+            ['threshold' => 51, 'name' => "Super {$suffix} 2"],
+            ['threshold' => 41, 'name' => "Super {$suffix} 1"],
+            ['threshold' => 31, 'name' => "{$suffix} 2"],
+            ['threshold' => 21, 'name' => "{$suffix} 1"],
+            ['threshold' => 11, 'name' => "Go {$suffix} 2"],
+            ['threshold' => 1, 'name' => "Go {$suffix} 1"],
+        ];
 
         foreach ($levels as $level) {
             if ($count >= $level['threshold']) {
-                $sentiment = [
+                return [
                     'count' => $count,
                     'name' => $level['name'],
-                    'level' => $level['level'],
-                    'emoji' => $level['emoji'],
+                    'level' => '',
+                    'emoji' => $isMoon ? '🚀' : '📉',
                     'type' => $isMoon ? 'Moon' : 'Crash',
-                    'full_name' => $level['emoji'] . ' ' . $level['name'] . ' ' . ($isMoon ? 'Moon' : 'Crash') . ' ' . $level['level']
+                    'full_name' => $level['name']
                 ];
-                return $sentiment;
             }
         }
 

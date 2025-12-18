@@ -15,8 +15,8 @@ class TelegramHelper {
      * Constructor
      */
     public function __construct() {
-        $config = require __DIR__ . '/config.php';
-        $this->botToken = $config['telegram']['bot_token'];
+        require_once __DIR__ . '/config.php';
+        $this->botToken = BOT_TOKEN;
         $this->baseUrl = "https://api.telegram.org/bot{$this->botToken}/";
         
         // Initialize persistent cURL handle
@@ -34,6 +34,12 @@ class TelegramHelper {
      * @return array|null
      */
     private function request($method, $params = []) {
+        // Validate BOT_TOKEN
+        if (empty($this->botToken) || $this->botToken === 'YOUR_BOT_TOKEN_HERE') {
+            error_log("TelegramHelper: BOT_TOKEN tidak valid");
+            return null;
+        }
+        
         $url = $this->baseUrl . $method;
 
         curl_setopt($this->curlHandle, CURLOPT_URL, $url);

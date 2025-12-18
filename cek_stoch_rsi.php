@@ -16,49 +16,69 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 // Load configuration
-$config = require __DIR__ . '/config.php';
-date_default_timezone_set($config['app']['timezone']);
+require_once __DIR__ . '/config.php';
+date_default_timezone_set('Asia/Jakarta');
 
 // Load dependencies
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/TelegramHelper.php';
-require_once __DIR__ . '/BinanceAPI.php';
+require_once __DIR__ . '/IndodaxAPI.php';
 require_once __DIR__ . '/Indicators.php';
 
 // Initialize components
 $telegram = new TelegramHelper();
-$binance = new BinanceAPI();
 $db = Database::getInstance();
 
 // Get supported trading pairs
-$supportedBases = $config['pairs']['supported_bases'];
-$quote = $config['pairs']['default_quote'];
-$chatId = $config['telegram']['chat_id_notifikasi'];
+$supportedBases = ['BTC', 'ETH', 'XRP', 'TRX', 'DOGE', 'LTC', 'XLM', 'ADA', 'BNB', 'USDT'];
+$quote = 'IDR';
+$chatId = CHAT_ID_NOTIFIKASI;
 
 echo "Starting StochRSI check...\n";
 
 $signals = [];
 
 foreach ($supportedBases as $base) {
-    $symbol = BinanceAPI::formatSymbol($base, $quote);
+    $symbol = IndodaxAPI::formatSymbol($base, $quote); // Returns 'BTC_IDR' format
     
     try {
         echo "Checking $symbol...\n";
         
-        // Get 4-hour klines
-        $klines = $binance->getKlines($symbol, '4h', 100);
+        // Query historical closing prices dengan simbol UPPERCASE
+        $query = "SELECT harga_tutup 
+                  FROM data_historis_harian 
+                  WHERE simbol = ?
+                  ORDER BY waktu_buka DESC 
+                  LIMIT 100";
         
-        if (!$klines) {
-            throw new Exception("Failed to fetch klines");
+        $stmt = $db->prepare($query, [$symbol], 's');
+        
+        if (!$stmt) {
+            throw new Exception("Failed to prepare query");
         }
-
-        $ohlc = $binance->parseOHLC($klines);
-        $closePrices = array_column($ohlc, 'close');
+        
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $closePrices = [];
+        while ($row = $result->fetch_assoc()) {
+            $closePrices[] = floatval($row['harga_tutup']);
+        }
+        $stmt->close();
+        
+        // Reverse untuk urutan oldest to newest
+        $closePrices = array_reverse($closePrices);
+        
+        if (count($closePrices) < 30) {
+            echo "  ⚠️  Insufficient data: " . count($closePrices) . " records\n";
+            continue;
+        }
         
         // Calculate StochRSI
         $stochRSI = Indicators::calculateStochRSI($closePrices, 14, 14, 3, 3);
         
         if (empty($stochRSI['k']) || empty($stochRSI['d'])) {
+            echo "  ⚠️  Failed to calculate StochRSI\n";
             continue;
         }
 

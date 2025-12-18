@@ -12,23 +12,22 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 // Load configuration
-$config = require __DIR__ . '/config.php';
-date_default_timezone_set($config['app']['timezone']);
+require_once __DIR__ . '/config.php';
+date_default_timezone_set('Asia/Jakarta');
 
 // Load dependencies
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/TelegramHelper.php';
-require_once __DIR__ . '/BinanceAPI.php';
+require_once __DIR__ . '/IndodaxAPI.php';
 require_once __DIR__ . '/Indicators.php';
 require_once __DIR__ . '/ChartGenerator.php';
 
 // Initialize components
 $telegram = new TelegramHelper();
-$binance = new BinanceAPI();
 $db = Database::getInstance();
 
-// Get batch size from config (ensure it's an integer)
-$batchSize = (int)$config['worker']['batch_size'];
+// Get batch size (default 5)
+$batchSize = 5;
 
 // Fetch pending jobs
 $result = $db->query(
@@ -63,19 +62,19 @@ foreach ($jobs as $job) {
         // Process based on command
         switch ($job['command']) {
             case 'price':
-                processPrice($telegram, $binance, $job);
+                processPrice($telegram, $db, $job);
                 break;
 
             case 'chart':
-                processChart($telegram, $binance, $job);
+                processChart($telegram, $db, $job);
                 break;
 
             case 'candlestick':
-                processCandlestick($telegram, $binance, $job);
+                processCandlestick($telegram, $db, $job);
                 break;
 
             case 'indicator':
-                processIndicator($telegram, $binance, $db, $job);
+                processIndicator($telegram, $db, $job);
                 break;
 
             default:
@@ -92,7 +91,7 @@ foreach ($jobs as $job) {
         // Send error message to user
         $telegram->sendMessage(
             $job['chat_id'],
-            "❌ Failed to process your request: " . $e->getMessage()
+            "❌ Gagal memproses permintaan: " . $e->getMessage()
         );
     }
 
@@ -122,114 +121,182 @@ function updateJobStatus($db, $jobId, $status) {
 /**
  * Process price command
  */
-function processPrice($telegram, $binance, $job) {
+function processPrice($telegram, $db, $job) {
     $symbol = $job['pair'];
+    $symbolLower = strtolower(str_replace('_', '', $symbol));
     
-    // Get 24hr ticker data
-    $ticker = $binance->get24hrTicker($symbol);
+    // Get ticker data
+    $ticker = IndodaxAPI::getPrice($symbolLower);
     
     if (!$ticker) {
-        throw new Exception("Failed to fetch price data for $symbol");
+        throw new Exception("Gagal mengambil data harga untuk $symbol");
     }
 
-    $price = floatval($ticker['lastPrice']);
-    $change24h = floatval($ticker['priceChangePercent']);
-    $high24h = floatval($ticker['highPrice']);
-    $low24h = floatval($ticker['lowPrice']);
-    $volume = floatval($ticker['volume']);
+    $price = floatval($ticker['last']);
+    $high24h = floatval($ticker['high']);
+    $low24h = floatval($ticker['low']);
+    $volume = floatval($ticker['vol_idr'] ?? 0);
+
+    // Calculate 24h change
+    $midPrice = ($high24h + $low24h) / 2;
+    $change24h = $midPrice > 0 ? (($price - $midPrice) / $midPrice) * 100 : 0;
 
     // Format message
-    $message = "💰 *{$symbol} Price*\n\n";
-    $message .= "💵 Price: `" . TelegramHelper::formatPrice($price) . " USDT`\n";
-    $message .= "📊 24h Change: " . TelegramHelper::formatPercentage($change24h) . "\n";
-    $message .= "📈 24h High: `" . TelegramHelper::formatPrice($high24h) . " USDT`\n";
-    $message .= "📉 24h Low: `" . TelegramHelper::formatPrice($low24h) . " USDT`\n";
-    $message .= "📦 24h Volume: `" . number_format($volume, 2) . "`\n";
-    $message .= "\n⏰ Updated: " . date('Y-m-d H:i:s');
+    $message = "💰 *{$symbol} Harga*\n\n";
+    $message .= "💵 Harga: `" . number_format($price, 0, ',', '.') . " IDR`\n";
+    $message .= "📊 Perubahan ~24j: " . ($change24h >= 0 ? '🟢' : '🔴') . " " . number_format($change24h, 2) . "%\n";
+    $message .= "📈 Tertinggi 24j: `" . number_format($high24h, 0, ',', '.') . " IDR`\n";
+    $message .= "📉 Terendah 24j: `" . number_format($low24h, 0, ',', '.') . " IDR`\n";
+    if ($volume > 0) {
+        $message .= "📦 Volume 24j: `" . number_format($volume, 0, ',', '.') . " IDR`\n";
+    }
+    $message .= "\n⏰ Update: " . date('Y-m-d H:i:s');
 
     $telegram->sendMessage($job['chat_id'], $message);
-
-    // Save to database
-    savePrice($binance, $symbol, $price, $high24h, $low24h);
 }
 
 /**
  * Process chart command
  */
-function processChart($telegram, $binance, $job) {
+function processChart($telegram, $db, $job) {
     $symbol = $job['pair'];
+    $symbolLower = strtolower(str_replace('_', '', $symbol));
     
-    // Get 5-minute klines for last hour (12 candles)
-    $klines = $binance->getKlines($symbol, '5m', 12);
+    // Query historical data from database
+    $tableName = 'riwayat_' . strtolower(str_replace('_', '_', $symbol));
     
-    if (!$klines) {
-        throw new Exception("Failed to fetch chart data for $symbol");
+    // Validate table name
+    if (!preg_match('/^riwayat_[a-z0-9_]+$/', $tableName)) {
+        throw new Exception("Nama tabel tidak valid");
     }
-
-    $ohlc = $binance->parseOHLC($klines);
+    
+    $query = "SELECT UNIX_TIMESTAMP(timestamp) as ts, harga 
+              FROM `{$tableName}` 
+              ORDER BY timestamp DESC 
+              LIMIT 60";
+    
+    $result = $db->query($query);
+    
+    if (!$result) {
+        throw new Exception("Gagal mengambil data chart untuk $symbol. Pastikan data historis tersedia.");
+    }
+    
+    $timestamps = [];
+    $prices = [];
+    
+    while ($row = $result->fetch_assoc()) {
+        $timestamps[] = (int)$row['ts'];
+        $prices[] = (float)$row['harga'];
+    }
+    $result->free();
+    
+    // Reverse arrays (oldest to newest)
+    $timestamps = array_reverse($timestamps);
+    $prices = array_reverse($prices);
+    
+    if (empty($timestamps) || empty($prices)) {
+        throw new Exception("Data chart tidak tersedia untuk $symbol");
+    }
     
     // Generate chart URL
-    $chartUrl = ChartGenerator::generateLineChart($ohlc, $symbol, '5m');
+    $chartUrl = ChartGenerator::getLineChartUrl($symbol, $timestamps, $prices);
     
     if (!$chartUrl) {
-        throw new Exception("Failed to generate chart for $symbol");
+        throw new Exception("Gagal membuat chart untuk $symbol");
     }
 
     // Send chart
-    $caption = "📈 *{$symbol} Line Chart*\n5-minute intervals (Last hour)";
+    $caption = "📈 *{$symbol} Line Chart*\nData historis terbaru";
     $telegram->sendPhoto($job['chat_id'], $chartUrl, $caption);
 }
 
 /**
  * Process candlestick chart command
  */
-function processCandlestick($telegram, $binance, $job) {
+function processCandlestick($telegram, $db, $job) {
     $symbol = $job['pair'];
     
-    // Get daily klines for last 30 days
-    $klines = $binance->getKlines($symbol, '1d', 30);
+    // Query OHLC data from database dengan simbol uppercase
+    $query = "SELECT waktu_buka, harga_buka, harga_tertinggi, harga_terendah, harga_tutup 
+              FROM data_historis_harian 
+              WHERE simbol = ?
+              ORDER BY waktu_buka DESC 
+              LIMIT 30";
     
-    if (!$klines) {
-        throw new Exception("Failed to fetch candlestick data for $symbol");
+    $stmt = $db->prepare($query, [$symbol], 's');
+    
+    if (!$stmt) {
+        throw new Exception("Gagal menyiapkan query candlestick");
     }
-
-    $ohlc = $binance->parseOHLC($klines);
+    
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $ohlcData = [];
+    while ($row = $result->fetch_assoc()) {
+        $ohlcData[] = $row;
+    }
+    $stmt->close();
+    
+    // Reverse untuk urutan oldest to newest
+    $ohlcData = array_reverse($ohlcData);
+    
+    if (empty($ohlcData)) {
+        throw new Exception("Data candlestick tidak tersedia untuk $symbol. Jalankan ambil_data_historis.php terlebih dahulu.");
+    }
     
     // Generate chart URL
-    $chartUrl = ChartGenerator::generateCandlestickChart($ohlc, $symbol);
+    $chartUrl = ChartGenerator::getCandlestickChartUrl($symbol, $ohlcData);
     
     if (!$chartUrl) {
-        throw new Exception("Failed to generate candlestick chart for $symbol");
+        throw new Exception("Gagal membuat candlestick chart untuk $symbol");
     }
 
     // Send chart
-    $caption = "🕯️ *{$symbol} Candlestick Chart*\nDaily candles (Last 30 days)";
+    $caption = "🕯️ *{$symbol} Candlestick Chart*\nDaily candles (30 hari terakhir)";
     $telegram->sendPhoto($job['chat_id'], $chartUrl, $caption);
 }
 
 /**
  * Process indicator command (StochRSI)
  */
-function processIndicator($telegram, $binance, $db, $job) {
+function processIndicator($telegram, $db, $job) {
     $symbol = $job['pair'];
     
-    // Get 4-hour klines for sufficient data (100 candles)
-    $klines = $binance->getKlines($symbol, '4h', 100);
+    // Query historical closing prices dengan simbol uppercase
+    $query = "SELECT harga_tutup 
+              FROM data_historis_harian 
+              WHERE simbol = ?
+              ORDER BY waktu_buka DESC 
+              LIMIT 100";
     
-    if (!$klines) {
-        throw new Exception("Failed to fetch data for indicator calculation");
+    $stmt = $db->prepare($query, [$symbol], 's');
+    
+    if (!$stmt) {
+        throw new Exception("Gagal menyiapkan query indicator");
     }
-
-    $ohlc = $binance->parseOHLC($klines);
     
-    // Extract closing prices
-    $closePrices = array_column($ohlc, 'close');
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $closePrices = [];
+    while ($row = $result->fetch_assoc()) {
+        $closePrices[] = floatval($row['harga_tutup']);
+    }
+    $stmt->close();
+    
+    // Reverse untuk urutan oldest to newest
+    $closePrices = array_reverse($closePrices);
+    
+    if (count($closePrices) < 30) {
+        throw new Exception("Data tidak cukup untuk menghitung StochRSI. Butuh minimal 30 data, tersedia " . count($closePrices) . ". Jalankan ambil_data_historis.php terlebih dahulu.");
+    }
     
     // Calculate StochRSI
     $stochRSI = Indicators::calculateStochRSI($closePrices, 14, 14, 3, 3);
     
     if (empty($stochRSI['k']) || empty($stochRSI['d'])) {
-        throw new Exception("Insufficient data for StochRSI calculation");
+        throw new Exception("Gagal menghitung StochRSI untuk $symbol");
     }
 
     // Get latest values
@@ -242,67 +309,11 @@ function processIndicator($telegram, $binance, $db, $job) {
     // Format message
     $message = "📊 *{$symbol} Stochastic RSI*\n\n";
     $message .= "{$signal['emoji']} *{$signal['condition']}*\n";
-    $message .= "📌 Signal: *{$signal['action']}*\n\n";
+    $message .= "📌 Sinyal: *{$signal['action']}*\n\n";
     $message .= "📈 K Line: `{$signal['k']}`\n";
     $message .= "📉 D Line: `{$signal['d']}`\n\n";
     $message .= "💡 {$signal['description']}\n";
-    $message .= "\n⏰ Calculated: " . date('Y-m-d H:i:s');
+    $message .= "\n⏰ Dihitung: " . date('Y-m-d H:i:s');
 
     $telegram->sendMessage($job['chat_id'], $message);
-    
-    // Generate and send StochRSI chart
-    $chartUrl = ChartGenerator::generateStochRSIChart($stochRSI['k'], $stochRSI['d'], $symbol);
-    
-    if ($chartUrl) {
-        $telegram->sendPhoto($job['chat_id'], $chartUrl, "StochRSI Chart for $symbol");
-    }
-}
-
-/**
- * Save price to database
- */
-function savePrice($binance, $symbol, $price, $high, $low) {
-    global $db;
-    
-    // Sanitize symbol - only allow alphanumeric characters
-    $sanitizedSymbol = preg_replace('/[^A-Za-z0-9]/', '', $symbol);
-    
-    // Validate that symbol ends with USDT (expected format)
-    if (substr($sanitizedSymbol, -4) !== 'USDT') {
-        error_log("Invalid symbol format: $symbol");
-        return;
-    }
-    
-    // Create table name from symbol (e.g., BTCUSDT -> riwayat_btc_usdt)
-    $tableName = 'riwayat_' . strtolower(str_replace('USDT', '_usdt', $sanitizedSymbol));
-    
-    // Additional validation: ensure table name matches expected pattern
-    if (!preg_match('/^riwayat_[a-z0-9]+_usdt$/', $tableName)) {
-        error_log("Invalid table name generated: $tableName");
-        return;
-    }
-    
-    // Create table if not exists
-    $createTableQuery = "CREATE TABLE IF NOT EXISTS `$tableName` (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        harga DECIMAL(20,8) NOT NULL,
-        harga_tertinggi DECIMAL(20,8) NOT NULL,
-        harga_terendah DECIMAL(20,8) NOT NULL,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_timestamp (timestamp)
-    )";
-    
-    $db->query($createTableQuery);
-    
-    // Insert price data
-    $stmt = $db->prepare(
-        "INSERT INTO `$tableName` (harga, harga_tertinggi, harga_terendah) VALUES (?, ?, ?)",
-        [$price, $high, $low],
-        'ddd'
-    );
-    
-    if ($stmt) {
-        $stmt->execute();
-        $stmt->close();
-    }
 }

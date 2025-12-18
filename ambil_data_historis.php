@@ -12,20 +12,19 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 // Load configuration
-$config = require __DIR__ . '/config.php';
-date_default_timezone_set($config['app']['timezone']);
+require_once __DIR__ . '/config.php';
+date_default_timezone_set('Asia/Jakarta');
 
 // Load dependencies
 require_once __DIR__ . '/Database.php';
-require_once __DIR__ . '/BinanceAPI.php';
+require_once __DIR__ . '/IndodaxAPI.php';
 
 // Initialize components
-$binance = new BinanceAPI();
 $db = Database::getInstance();
 
-// Get supported trading pairs
-$supportedBases = $config['pairs']['supported_bases'];
-$quote = $config['pairs']['default_quote'];
+// Get supported trading pairs from Indodax
+$supportedBases = ['BTC', 'ETH', 'XRP', 'TRX', 'DOGE', 'LTC', 'XLM', 'ADA', 'BNB', 'USDT'];
+$quote = 'IDR';
 
 echo "Starting historical data fetch...\n";
 
@@ -33,20 +32,26 @@ $successCount = 0;
 $errorCount = 0;
 
 foreach ($supportedBases as $base) {
-    $symbol = BinanceAPI::formatSymbol($base, $quote);
+    $symbol = IndodaxAPI::formatSymbol($base, $quote); // Returns 'BTC_IDR' format
+    $symbolLower = strtolower(str_replace('_', '', $symbol)); // 'btcidr' for API
     
     try {
         echo "Fetching data for $symbol...\n";
         
-        // Fetch daily klines for last 365 days
-        $klines = $binance->getKlines($symbol, '1d', 365);
+        // Fetch daily OHLC data from Indodax
+        $ohlcData = IndodaxAPI::getDailyOHLC($symbolLower);
         
-        if (!$klines) {
-            throw new Exception("Failed to fetch klines for $symbol");
+        if (!$ohlcData) {
+            throw new Exception("Failed to fetch OHLC data for $symbol");
         }
 
-        // Insert data into database
-        $insertedCount = insertHistoricalData($db, $symbol, $klines);
+        // Validate data
+        if (!is_array($ohlcData) || empty($ohlcData)) {
+            throw new Exception("Empty or invalid OHLC data for $symbol");
+        }
+
+        // Insert data into database with UPPERCASE symbol
+        $insertedCount = insertHistoricalData($db, $symbol, $ohlcData);
         
         echo "  ✓ Inserted/updated $insertedCount candles for $symbol\n";
         $successCount++;
@@ -70,17 +75,32 @@ exit($errorCount > 0 ? 1 : 0);
 
 /**
  * Insert historical data into database
+ * 
+ * @param Database $db Database instance
+ * @param string $symbol Symbol in UPPERCASE format (e.g., 'BTC_IDR')
+ * @param array $ohlcData OHLC data from Indodax API
+ * @return int Number of inserted/updated records
  */
-function insertHistoricalData($db, $symbol, $klines) {
+function insertHistoricalData($db, $symbol, $ohlcData) {
     $insertedCount = 0;
     
-    foreach ($klines as $kline) {
-        $timestamp = $kline[0];
-        $open = floatval($kline[1]);
-        $high = floatval($kline[2]);
-        $low = floatval($kline[3]);
-        $close = floatval($kline[4]);
-        $volume = floatval($kline[5]);
+    foreach ($ohlcData as $candle) {
+        // Indodax OHLC format: [timestamp, open, high, low, close, volume]
+        if (!is_array($candle) || count($candle) < 6) {
+            continue;
+        }
+        
+        $timestamp = (int)$candle[0];
+        $open = floatval($candle[1]);
+        $high = floatval($candle[2]);
+        $low = floatval($candle[3]);
+        $close = floatval($candle[4]);
+        $volume = floatval($candle[5]);
+        
+        // Validate data
+        if ($timestamp <= 0 || $open <= 0 || $high <= 0 || $low <= 0 || $close <= 0) {
+            continue;
+        }
         
         // Use INSERT ... ON DUPLICATE KEY UPDATE to avoid duplicates
         $query = "INSERT INTO data_historis_harian 
@@ -96,7 +116,7 @@ function insertHistoricalData($db, $symbol, $klines) {
         $stmt = $db->prepare(
             $query,
             [$symbol, $timestamp, $open, $high, $low, $close, $volume],
-            'sidddd'
+            'sidddd d'
         );
         
         if ($stmt) {

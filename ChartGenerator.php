@@ -12,143 +12,102 @@ class ChartGenerator {
     /**
      * Generate line chart URL
      * 
-     * @param array $data Array of price data with timestamp and price
-     * @param string $symbol Trading pair symbol
-     * @param string $interval Time interval
+     * @param string $pair Trading pair (e.g., 'BTC_IDR')
+     * @param array $timestamps Array of timestamps
+     * @param array $prices Array of prices
      * @return string Chart URL
      */
-    public static function generateLineChart($data, $symbol, $interval = '5m') {
-        if (empty($data)) {
+    public static function getLineChartUrl(string $pair, array $timestamps, array $prices): string {
+        if (empty($timestamps) || empty($prices)) {
             return '';
         }
 
-        $labels = [];
-        $prices = [];
-
-        foreach ($data as $point) {
-            $labels[] = date('H:i', $point['timestamp'] / 1000);
-            $prices[] = $point['close'];
-        }
-
+        $labels = array_map(fn($ts) => date('H:i', $ts), $timestamps);
+        $minPrice = min($prices);
+        $maxPrice = max($prices);
+        $padding = 0.01;
+        
         $chartConfig = [
             'type' => 'line',
             'data' => [
                 'labels' => $labels,
-                'datasets' => [
-                    [
-                        'label' => $symbol,
-                        'data' => $prices,
-                        'fill' => false,
-                        'borderColor' => 'rgb(75, 192, 192)',
-                        'tension' => 0.1,
-                        'pointRadius' => 2,
-                        'pointHoverRadius' => 5
-                    ]
-                ]
+                'datasets' => [[
+                    'label' => $pair,
+                    'data' => array_map('floatval', $prices),
+                    'fill' => false,
+                    'borderColor' => 'rgb(75, 192, 192)',
+                    'tension' => 0.1,
+                    'pointRadius' => 2
+                ]]
             ],
             'options' => [
-                'title' => [
-                    'display' => true,
-                    'text' => "$symbol Price Chart ($interval)",
-                    'fontSize' => 16
-                ],
-                'legend' => [
-                    'display' => false
-                ],
+                'title' => ['display' => true, 'text' => "Chart Harga {$pair}"],
                 'scales' => [
-                    'xAxes' => [
-                        [
-                            'display' => true,
-                            'scaleLabel' => [
-                                'display' => true,
-                                'labelString' => 'Time'
-                            ]
-                        ]
-                    ],
-                    'yAxes' => [
-                        [
-                            'display' => true,
-                            'scaleLabel' => [
-                                'display' => true,
-                                'labelString' => 'Price (USDT)'
-                            ]
-                        ]
+                    'y' => [
+                        'beginAtZero' => false,
+                        'min' => $minPrice * (1 - $padding),
+                        'max' => $maxPrice * (1 + $padding)
                     ]
                 ]
             ]
         ];
-
+        
         return self::buildChartUrl($chartConfig, 800, 400);
     }
 
     /**
      * Generate candlestick chart URL
      * 
-     * @param array $data Array of OHLC data
-     * @param string $symbol Trading pair symbol
+     * @param string $pair Trading pair (e.g., 'BTC_IDR')
+     * @param array $ohlcData Array of OHLC data from database
      * @return string Chart URL
      */
-    public static function generateCandlestickChart($data, $symbol) {
-        if (empty($data)) {
+    public static function getCandlestickChartUrl(string $pair, array $ohlcData): string {
+        if (empty($ohlcData)) {
             return '';
         }
 
-        $labels = [];
-        $ohlcData = [];
-
-        foreach ($data as $candle) {
-            $labels[] = date('M d', $candle['timestamp'] / 1000);
-            $ohlcData[] = [
-                'o' => $candle['open'],
-                'h' => $candle['high'],
-                'l' => $candle['low'],
-                'c' => $candle['close']
+        // FIX: Konversi timestamp ke milidetik untuk QuickChart
+        $dataPoints = array_map(function($row) {
+            $timestamp = (int)$row['waktu_buka'];
+            // Jika timestamp dalam detik (10 digit), konversi ke milidetik
+            if ($timestamp < 10000000000) {
+                $timestamp = $timestamp * 1000;
+            }
+            return [
+                't' => $timestamp,
+                'o' => (float)$row['harga_buka'],
+                'h' => (float)$row['harga_tertinggi'],
+                'l' => (float)$row['harga_terendah'],
+                'c' => (float)$row['harga_tutup']
             ];
-        }
-
+        }, $ohlcData);
+        
+        $lows = array_map('floatval', array_column($ohlcData, 'harga_terendah'));
+        $highs = array_map('floatval', array_column($ohlcData, 'harga_tertinggi'));
+        $padding = 0.02;
+        
         $chartConfig = [
             'type' => 'candlestick',
             'data' => [
-                'labels' => $labels,
-                'datasets' => [
-                    [
-                        'label' => $symbol,
-                        'data' => $ohlcData
-                    ]
-                ]
+                'datasets' => [[
+                    'label' => $pair,
+                    'data' => $dataPoints
+                ]]
             ],
             'options' => [
-                'title' => [
-                    'display' => true,
-                    'text' => "$symbol Candlestick Chart (30 Days)",
-                    'fontSize' => 16
-                ],
-                'legend' => [
-                    'display' => false
-                ],
+                'title' => ['display' => true, 'text' => "Daily Candlestick Chart {$pair}"],
                 'scales' => [
-                    'xAxes' => [
-                        [
-                            'display' => true,
-                            'scaleLabel' => [
-                                'display' => true,
-                                'labelString' => 'Date'
-                            ]
-                        ]
-                    ],
-                    'yAxes' => [
-                        [
-                            'display' => true,
-                            'scaleLabel' => [
-                                'display' => true,
-                                'labelString' => 'Price (USDT)'
-                            ]
-                        ]
+                    'x' => ['type' => 'time', 'time' => ['unit' => 'day']],
+                    'y' => [
+                        'beginAtZero' => false,
+                        'min' => min($lows) * (1 - $padding),
+                        'max' => max($highs) * (1 + $padding)
                     ]
                 ]
             ]
         ];
-
+        
         return self::buildChartUrl($chartConfig, 800, 500);
     }
 
