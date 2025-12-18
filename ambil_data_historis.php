@@ -116,7 +116,7 @@ function insertHistoricalData($db, $symbol, $ohlcData) {
         $stmt = $db->prepare(
             $query,
             [$symbol, $timestamp, $open, $high, $low, $close, $volume],
-            'sidddd d'
+            'siddddd'
         );
         
         if ($stmt) {
