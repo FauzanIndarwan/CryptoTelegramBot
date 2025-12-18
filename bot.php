@@ -12,25 +12,24 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
 // Load configuration
-$config = require __DIR__ . '/config.php';
-date_default_timezone_set($config['app']['timezone']);
+require_once __DIR__ . '/config.php';
+date_default_timezone_set('Asia/Jakarta');
 
 // Load dependencies
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/TelegramHelper.php';
-require_once __DIR__ . '/BinanceAPI.php';
+require_once __DIR__ . '/IndodaxAPI.php';
 require_once __DIR__ . '/Indicators.php';
 
 // Initialize components
 $telegram = new TelegramHelper();
-$binance = new BinanceAPI();
 $db = Database::getInstance();
 
 /**
  * Handle cron job requests for market sentiment monitoring
  */
-if (isset($_GET['cron']) && hash_equals($config['cron']['secret_key'], $_GET['cron'])) {
-    handleCronJob($telegram, $binance, $db, $config);
+if (isset($_GET['cron']) && hash_equals(KUNCI_RAHASIA_CRON, $_GET['cron'])) {
+    handleCronJob($telegram, $db);
     exit;
 }
 
@@ -67,32 +66,32 @@ if ($message) {
         case '/harga':
         case '/price':
             $base = strtoupper($parts[1] ?? 'BTC');
-            $quote = strtoupper($parts[2] ?? 'USDT');
+            $quote = strtoupper($parts[2] ?? 'IDR');
             queueJob($db, $chatId, 'price', $base, $quote);
-            $telegram->sendMessage($chatId, "⏳ Fetching price for $base/$quote...");
+            $telegram->sendMessage($chatId, "⏳ Mengambil harga $base/$quote...");
             break;
 
         case '/chart':
             $base = strtoupper($parts[1] ?? 'BTC');
-            $quote = strtoupper($parts[2] ?? 'USDT');
+            $quote = strtoupper($parts[2] ?? 'IDR');
             queueJob($db, $chatId, 'chart', $base, $quote);
-            $telegram->sendMessage($chatId, "⏳ Generating chart for $base/$quote...");
+            $telegram->sendMessage($chatId, "⏳ Membuat chart untuk $base/$quote...");
             break;
 
         case '/chartdaily':
         case '/candlestick':
             $base = strtoupper($parts[1] ?? 'BTC');
-            $quote = strtoupper($parts[2] ?? 'USDT');
+            $quote = strtoupper($parts[2] ?? 'IDR');
             queueJob($db, $chatId, 'candlestick', $base, $quote);
-            $telegram->sendMessage($chatId, "⏳ Generating candlestick chart for $base/$quote...");
+            $telegram->sendMessage($chatId, "⏳ Membuat candlestick chart untuk $base/$quote...");
             break;
 
         case '/indicator':
         case '/stochrsi':
             $base = strtoupper($parts[1] ?? 'BTC');
-            $quote = strtoupper($parts[2] ?? 'USDT');
+            $quote = strtoupper($parts[2] ?? 'IDR');
             queueJob($db, $chatId, 'indicator', $base, $quote);
-            $telegram->sendMessage($chatId, "⏳ Calculating StochRSI for $base/$quote...");
+            $telegram->sendMessage($chatId, "⏳ Menghitung StochRSI untuk $base/$quote...");
             break;
 
         case '/stop':
@@ -119,18 +118,18 @@ http_response_code(200);
  * Handle /start command
  */
 function handleStartCommand($telegram, $chatId, $userName) {
-    $message = "👋 Hello, $userName!\n\n";
+    $message = "👋 Halo, $userName!\n\n";
     $message .= "🤖 *Crypto Telegram Bot*\n";
-    $message .= "Monitor cryptocurrency prices from Binance\n\n";
-    $message .= "📊 *Available Commands:*\n";
-    $message .= "/harga BTC USDT - Get current price\n";
-    $message .= "/chart ETH USDT - Line chart (1 hour)\n";
-    $message .= "/chartdaily BTC USDT - Candlestick chart (30 days)\n";
-    $message .= "/indicator BTC USDT - Stochastic RSI analysis\n";
-    $message .= "/stop - Cancel all pending jobs\n";
-    $message .= "/help - Show this help message\n\n";
-    $message .= "💡 *Example:* `/harga BTC USDT`\n";
-    $message .= "📈 Supports all Binance USDT pairs!";
+    $message .= "Monitor harga cryptocurrency dari Indodax\n\n";
+    $message .= "📊 *Perintah yang Tersedia:*\n";
+    $message .= "/harga BTC IDR - Cek harga terkini\n";
+    $message .= "/chart ETH IDR - Line chart\n";
+    $message .= "/chartdaily BTC IDR - Candlestick chart (30 hari)\n";
+    $message .= "/indicator BTC IDR - Analisis Stochastic RSI\n";
+    $message .= "/stop - Batalkan semua pekerjaan\n";
+    $message .= "/help - Lihat panduan\n\n";
+    $message .= "💡 *Contoh:* `/harga BTC IDR`\n";
+    $message .= "📈 Mendukung semua pair IDR di Indodax!";
 
     $telegram->sendMessage($chatId, $message);
 }
@@ -139,33 +138,33 @@ function handleStartCommand($telegram, $chatId, $userName) {
  * Handle /help command
  */
 function handleHelpCommand($telegram, $chatId) {
-    $message = "📚 *Command Guide*\n\n";
+    $message = "📚 *Panduan Perintah*\n\n";
     $message .= "🔹 */harga [BASE] [QUOTE]*\n";
-    $message .= "Get real-time price and 24h statistics\n";
-    $message .= "Example: `/harga BTC USDT`\n\n";
+    $message .= "Cek harga real-time dan statistik 24 jam\n";
+    $message .= "Contoh: `/harga BTC IDR`\n\n";
     
     $message .= "🔹 */chart [BASE] [QUOTE]*\n";
-    $message .= "Generate 5-minute interval line chart\n";
-    $message .= "Shows last hour of price movement\n";
-    $message .= "Example: `/chart ETH USDT`\n\n";
+    $message .= "Buat line chart pergerakan harga\n";
+    $message .= "Menampilkan data historis\n";
+    $message .= "Contoh: `/chart ETH IDR`\n\n";
     
     $message .= "🔹 */chartdaily [BASE] [QUOTE]*\n";
-    $message .= "Generate daily candlestick chart\n";
-    $message .= "Shows last 30 days of trading\n";
-    $message .= "Example: `/chartdaily BNB USDT`\n\n";
+    $message .= "Buat candlestick chart harian\n";
+    $message .= "Menampilkan 30 hari terakhir\n";
+    $message .= "Contoh: `/chartdaily BTC IDR`\n\n";
     
     $message .= "🔹 */indicator [BASE] [QUOTE]*\n";
-    $message .= "Calculate Stochastic RSI indicator\n";
-    $message .= "Provides buy/sell signals\n";
-    $message .= "Example: `/indicator SOL USDT`\n\n";
+    $message .= "Hitung indikator Stochastic RSI\n";
+    $message .= "Memberikan sinyal beli/jual\n";
+    $message .= "Contoh: `/indicator BTC IDR`\n\n";
     
     $message .= "🔹 */stop*\n";
-    $message .= "Cancel all your pending jobs\n\n";
+    $message .= "Batalkan semua pekerjaan yang tertunda\n\n";
     
     $message .= "💡 *Tips:*\n";
-    $message .= "• Default quote currency is USDT\n";
-    $message .= "• Commands are case-insensitive\n";
-    $message .= "• Most popular pairs: BTC, ETH, BNB, SOL, XRP";
+    $message .= "• Quote currency default adalah IDR\n";
+    $message .= "• Perintah tidak case-sensitive\n";
+    $message .= "• Pair populer: BTC, ETH, XRP, TRX, DOGE";
 
     $telegram->sendMessage($chatId, $message);
 }
@@ -174,7 +173,7 @@ function handleHelpCommand($telegram, $chatId) {
  * Queue a job for processing
  */
 function queueJob($db, $chatId, $command, $base, $quote) {
-    $symbol = BinanceAPI::formatSymbol($base, $quote);
+    $symbol = IndodaxAPI::formatSymbol($base, $quote);
     
     $stmt = $db->prepare(
         "INSERT INTO bot_job_queue (chat_id, command, pair, status) VALUES (?, ?, ?, 'pending')",
@@ -207,9 +206,9 @@ function cancelJobs($db, $chatId) {
 /**
  * Handle cron job for market sentiment monitoring
  */
-function handleCronJob($telegram, $binance, $db, $config) {
+function handleCronJob($telegram, $db) {
     try {
-        $tickers = $binance->getAllTickers();
+        $tickers = IndodaxAPI::getTickers();
         
         if (!$tickers) {
             error_log("Failed to fetch tickers for cron job");
@@ -218,26 +217,39 @@ function handleCronJob($telegram, $binance, $db, $config) {
 
         $moonCoins = [];
         $crashCoins = [];
-        $threshold = $config['monitoring']['price_change_threshold'];
+        $threshold = AMBANG_BATAS_PERSENTASE;
 
-        foreach ($tickers as $ticker) {
-            // Only process USDT pairs
-            if (substr($ticker['symbol'], -4) !== 'USDT') {
+        foreach ($tickers as $pair => $ticker) {
+            // Skip if not IDR pair
+            if (!str_contains($pair, 'idr')) {
                 continue;
             }
 
-            $priceChange = floatval($ticker['priceChangePercent']);
-
-            if ($priceChange >= $threshold) {
-                $moonCoins[] = [
-                    'symbol' => $ticker['symbol'],
-                    'change' => $priceChange
-                ];
-            } elseif ($priceChange <= -$threshold) {
-                $crashCoins[] = [
-                    'symbol' => $ticker['symbol'],
-                    'change' => $priceChange
-                ];
+            // Calculate 24h change percentage
+            $last = floatval($ticker['last']);
+            $high = floatval($ticker['high']);
+            $low = floatval($ticker['low']);
+            
+            // Estimate change based on current position between high and low
+            if ($high > 0 && $low > 0) {
+                $midPrice = ($high + $low) / 2;
+                if ($midPrice > 0) {
+                    $priceChange = (($last - $midPrice) / $midPrice) * 100;
+                    
+                    $symbol = strtoupper(str_replace('idr', '_idr', $pair));
+                    
+                    if ($priceChange >= $threshold) {
+                        $moonCoins[] = [
+                            'symbol' => $symbol,
+                            'change' => $priceChange
+                        ];
+                    } elseif ($priceChange <= -$threshold) {
+                        $crashCoins[] = [
+                            'symbol' => $symbol,
+                            'change' => $priceChange
+                        ];
+                    }
+                }
             }
         }
 
@@ -262,22 +274,33 @@ function handleCronJob($telegram, $binance, $db, $config) {
 
         // Send notification if significant movement
         if ($moonCount >= 10 || $crashCount >= 10) {
-            $chatId = $config['telegram']['chat_id_notifikasi'];
-            $message = "🔔 *Market Sentiment Alert*\n\n";
+            $chatId = CHAT_ID_NOTIFIKASI;
+            
+            // Validate chat ID
+            if (empty($chatId) || $chatId === 'YOUR_CHAT_ID') {
+                error_log("Chat ID notifikasi tidak valid");
+                return;
+            }
+            
+            $message = "🔔 *Sentimen Pasar Alert*\n\n";
             
             if ($moonCount >= 10) {
-                $message .= "🚀 *Bullish Movement*\n";
+                $message .= "🚀 *Pergerakan Bullish*\n";
                 $message .= "{$moonSentiment['full_name']}\n";
-                $message .= "Coins up >{$threshold}%: $moonCount\n\n";
+                $message .= "Koin naik >{$threshold}%: $moonCount\n\n";
             }
             
             if ($crashCount >= 10) {
-                $message .= "📉 *Bearish Movement*\n";
+                $message .= "📉 *Pergerakan Bearish*\n";
                 $message .= "{$crashSentiment['full_name']}\n";
-                $message .= "Coins down <-{$threshold}%: $crashCount\n";
+                $message .= "Koin turun <-{$threshold}%: $crashCount\n";
             }
 
-            $telegram->sendMessage($chatId, $message);
+            $result = $telegram->sendMessage($chatId, $message);
+            
+            if (!$result) {
+                error_log("Failed to send notification message");
+            }
         }
 
     } catch (Exception $e) {

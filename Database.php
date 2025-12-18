@@ -9,13 +9,12 @@
 class Database {
     private static $instance = null;
     private $connection = null;
-    private $config;
 
     /**
      * Private constructor to prevent direct instantiation
      */
     private function __construct() {
-        $this->config = require __DIR__ . '/config.php';
+        require_once __DIR__ . '/config.php';
         $this->connect();
     }
 
@@ -36,20 +35,18 @@ class Database {
      */
     private function connect() {
         try {
-            $dbConfig = $this->config['database'];
-            
             $this->connection = new mysqli(
-                $dbConfig['host'],
-                $dbConfig['user'],
-                $dbConfig['password'],
-                $dbConfig['name']
+                DB_HOST,
+                DB_USER,
+                DB_PASS,
+                DB_NAME
             );
 
             if ($this->connection->connect_error) {
                 throw new Exception("Connection failed: " . $this->connection->connect_error);
             }
 
-            $this->connection->set_charset($dbConfig['charset']);
+            $this->connection->set_charset('utf8mb4');
             
         } catch (Exception $e) {
             error_log("Database connection error: " . $e->getMessage());
