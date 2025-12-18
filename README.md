@@ -1,14 +1,14 @@
 # 🤖 Crypto Telegram Bot
 
 <p align="center">
-  <img src="https://img.shields.io/badge/PHP-8.0+-777BB4? style=for-the-badge&logo=php&logoColor=white" alt="PHP Version">
+  <img src="https://img.shields.io/badge/PHP-8.0+-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP Version">
   <img src="https://img.shields.io/badge/MySQL-5.7+-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL">
   <img src="https://img.shields.io/badge/Telegram-Bot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Bot">
-  <img src="https://img.shields.io/badge/Binance-API-F3BA2F?style=for-the-badge&logo=binance&logoColor=white" alt="Binance API">
+  <img src="https://img.shields.io/badge/Indodax-API-FF6C00?style=for-the-badge" alt="Indodax API">
 </p>
 
 <p align="center">
-  <b>Bot Telegram untuk monitoring harga cryptocurrency dari Binance dengan fitur analisis teknikal otomatis</b>
+  <b>Bot Telegram untuk monitoring harga cryptocurrency dari Indodax dengan fitur analisis teknikal otomatis</b>
 </p>
 
 ---
@@ -17,8 +17,8 @@
 
 | Fitur | Deskripsi |
 |-------|-----------|
-| 📊 **Real-time Price** | Pantau harga crypto real-time dari Binance |
-| 📈 **Line Chart** | Visualisasi pergerakan harga per 5 menit |
+| 📊 **Real-time Price** | Pantau harga crypto real-time dari Indodax |
+| 📈 **Line Chart** | Visualisasi pergerakan harga historis |
 | 🕯️ **Candlestick Chart** | Chart harian dengan data OHLC (30 hari) |
 | 📉 **Stochastic RSI** | Indikator teknikal untuk analisis oversold/overbought |
 | 🚀 **Moon/Crash Alert** | Notifikasi otomatis saat terjadi pergerakan signifikan (>5%) |
@@ -45,9 +45,9 @@ cd CryptoTelegramBot
 2. **Setup Database**
 ```bash
 mysql -u root -p < setup_database.sql
-# Or manually:
+# Atau secara manual:
 # CREATE DATABASE crypto_bot;
-# Then import setup_database.sql
+# Kemudian import setup_database.sql
 ```
 
 3. **Konfigurasi**
@@ -57,29 +57,29 @@ cp config.example.php config.php
 nano config.php
 ```
 
-**Configure the following:**
-- `telegram.bot_token` - Your Telegram bot token from @BotFather
-- `telegram.chat_id_notifikasi` - Your chat ID for notifications
-- `database.*` - MySQL database credentials
-- `cron.secret_key` - Secret key for cron job security
+**Konfigurasi yang perlu diisi:**
+- `BOT_TOKEN` - Token bot Telegram dari @BotFather
+- `CHAT_ID_NOTIFIKASI` - Chat ID untuk notifikasi
+- `DB_HOST`, `DB_USER`, `DB_PASS`, `DB_NAME` - Kredensial database MySQL
+- `KUNCI_RAHASIA_CRON` - Secret key untuk keamanan cron job
 
 4. **Setup Webhook Telegram**
 ```
-https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook?url=https://yourdomain.com/bot. php
+https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook?url=https://yourdomain.com/bot.php
 ```
 
 5. **Setup Cron Jobs**
 ```bash
-# Setiap 5 menit - Update harga & sinyal
-*/5 * * * * curl -s "https://yourdomain.com/bot.php? cron=YOUR_CRON_KEY"
+# Setiap 5 menit - Update harga & sinyal sentimen pasar
+*/5 * * * * curl -s "https://yourdomain.com/bot.php?cron=YOUR_CRON_KEY"
 
 # Setiap 1 menit - Process job queue
 * * * * * php /path/to/worker.php
 
-# Setiap hari jam 00:05 - Ambil data historis
+# Setiap hari jam 00:05 - Ambil data historis OHLC
 5 0 * * * php /path/to/ambil_data_historis.php
 
-# Setiap 4 jam - Cek StochRSI
+# Setiap 4 jam - Cek StochRSI dan kirim alert
 0 */4 * * * php /path/to/cek_stoch_rsi.php
 ```
 
@@ -90,13 +90,14 @@ https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook?url=https://yourdomain.com/b
 | Perintah | Contoh | Deskripsi |
 |----------|--------|-----------|
 | `/start` | `/start` | Memulai bot dan melihat daftar perintah |
-| `/harga` | `/harga BTC USDT` | Cek harga terkini suatu pair |
-| `/chart` | `/chart ETH USDT` | Line chart pergerakan 1 jam terakhir |
-| `/chartdaily` | `/chartdaily BTC USDT` | Candlestick chart 30 hari |
-| `/indicator` | `/indicator BTC USDT` | Analisis Stochastic RSI |
+| `/harga` | `/harga BTC IDR` | Cek harga terkini suatu pair |
+| `/chart` | `/chart ETH IDR` | Line chart pergerakan harga historis |
+| `/chartdaily` | `/chartdaily BTC IDR` | Candlestick chart 30 hari |
+| `/indicator` | `/indicator BTC IDR` | Analisis Stochastic RSI |
 | `/stop` | `/stop` | Batalkan semua pekerjaan dalam antrian |
+| `/help` | `/help` | Tampilkan panduan lengkap |
 
-**Note:** All trading pairs use USDT as the quote currency (e.g., BTC/USDT, ETH/USDT). This is different from the previous version which used IDR.
+**Catatan:** Semua trading pair menggunakan IDR sebagai quote currency (contoh: BTC/IDR, ETH/IDR).
 
 ---
 
@@ -122,7 +123,7 @@ Bot menggunakan sistem level sentimen untuk mengkategorikan kondisi pasar berdas
 | 🚀 Go Moon 2 | 11-20 |
 | 🚀 Go Moon 1 | 1-10 |
 
-### 🔻 Crash Levels (Bearish)
+### 📉 Crash Levels (Bearish)
 
 | Level | Jumlah Koin |
 |-------|-------------|
@@ -159,7 +160,7 @@ CryptoTelegramBot/
 ├── 🔧 Core Classes
 │   ├── Database.php            # Database singleton dengan connection pooling
 │   ├── TelegramHelper.php      # Telegram API helper dengan reusable cURL
-│   ├── BinanceAPI.php          # Binance API wrapper dengan caching dan retry
+│   ├── IndodaxAPI.php          # Indodax API wrapper dengan caching dan retry
 │   ├── Indicators.php          # Kalkulasi indikator teknikal (RSI, StochRSI)
 │   └── ChartGenerator.php      # Generator URL chart menggunakan QuickChart
 │
@@ -170,16 +171,16 @@ CryptoTelegramBot/
 
 ## ⚡ Optimasi yang Diterapkan
 
-| Aspek | Sebelum | Sesudah |
-|-------|---------|---------|
-| 🔌 **Database** | Buka/tutup berulang | Singleton pattern |
-| 🌐 **cURL** | Handle baru tiap request | Reusable handle |
-| 💾 **Caching** | Tidak ada | API cache 60 detik |
-| 🔄 **Retry Logic** | Tidak ada | Exponential backoff |
-| 📦 **Batch Processing** | Satu per satu | Batch 5 pekerjaan |
-| 🏛️ **Struktur** | Prosedural | OOP dengan class |
-| ⚠️ **Error Handling** | Tidak konsisten | Try-catch terstruktur |
-| 🔒 **Security** | Hardcoded credentials | Environment variables |
+| Aspek | Teknik | Manfaat |
+|-------|--------|---------|
+| 🔌 **Database** | Singleton pattern | Satu koneksi untuk semua operasi |
+| 🌐 **cURL** | Reusable handle | Mengurangi overhead koneksi |
+| 💾 **Caching** | API cache 60 detik | Mengurangi beban ke Indodax API |
+| 🔄 **Retry Logic** | Exponential backoff | Meningkatkan reliability |
+| 📦 **Batch Processing** | Batch 5 pekerjaan | Efisiensi proses worker |
+| 🏛️ **Struktur** | OOP dengan class | Kode lebih maintainable |
+| ⚠️ **Error Handling** | Try-catch terstruktur | Error handling yang konsisten |
+| 🔒 **Security** | Environment variables | Credentials tidak hardcoded |
 
 ---
 
@@ -216,7 +217,7 @@ CREATE TABLE bot_job_queue (
     chat_id VARCHAR(50) NOT NULL,
     command VARCHAR(50) NOT NULL,
     pair VARCHAR(20) NOT NULL,
-    status ENUM('pending', 'processing', 'done', 'failed') DEFAULT 'pending',
+    status ENUM('pending', 'processing', 'done', 'failed', 'cancelled') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_status (status),
     INDEX idx_chat_id (chat_id)
@@ -226,9 +227,9 @@ CREATE TABLE bot_job_queue (
 CREATE TABLE laporan_sentimen_pasar (
     id INT AUTO_INCREMENT PRIMARY KEY,
     moon_count INT DEFAULT 0,
-    moon_level VARCHAR(50),
+    moon_level VARCHAR(100),
     crash_count INT DEFAULT 0,
-    crash_level VARCHAR(50),
+    crash_level VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_created (created_at)
 );
@@ -243,7 +244,7 @@ CREATE TABLE laporan_sentimen_pasar (
 ### Menggunakan Environment Variables (Recommended)
 
 ```bash
-# Tambahkan ke . bashrc atau .env
+# Tambahkan ke .bashrc atau .env
 export BOT_TOKEN="your_bot_token"
 export CHAT_ID_NOTIFIKASI="your_chat_id"
 export DB_HOST="localhost"
@@ -255,31 +256,52 @@ export CRON_KEY="your_secret_key"
 
 ---
 
+## 🐛 Bug Fixes
+
+### Bug yang Telah Diperbaiki
+
+1. **✅ Notifikasi Moon/Crash Tidak Terkirim**
+   - Ditambahkan validasi BOT_TOKEN dan CHAT_ID
+   - Implementasi error logging yang lebih baik
+   - Response check dari Telegram API
+
+2. **✅ Candlestick Chart Tidak Berfungsi**
+   - Fix konversi timestamp ke milidetik untuk QuickChart
+   - Konsistensi simbol menggunakan uppercase (`BTC_IDR`)
+   - Validasi data OHLC sebelum generate chart
+
+3. **✅ Indikator StochRSI Tidak Berfungsi**
+   - Query menggunakan simbol uppercase yang konsisten
+   - Validasi minimum 30 data sebelum kalkulasi
+   - Error message yang informatif
+
+---
+
 ## 📝 Changelog
 
-### v3.0.0 (2025) - Binance API Migration
-- 🔄 **BREAKING:** Migrated from Indodax API to Binance API
-- 🔄 **BREAKING:** Changed from IDR pairs to USDT pairs
-- ✅ Refactored to full object-oriented architecture
-- ✅ Added BinanceAPI wrapper class with caching and retry logic
-- ✅ Implemented comprehensive technical indicators (RSI, StochRSI)
-- ✅ Added ChartGenerator for QuickChart integration
-- ✅ Improved database connection with singleton pattern
-- ✅ Batch processing for job queue (5 jobs per batch)
-- ✅ Enhanced security with environment variables support
-- ✅ Added comprehensive error handling and logging
-- ✅ Created modular, maintainable code structure
+### v4.0.0 (2025) - Kembali ke Indodax API
+- 🔄 **BREAKING:** Migrasi kembali dari Binance API ke Indodax API
+- 🔄 **BREAKING:** Perubahan dari USDT pairs ke IDR pairs
+- ✅ Implementasi IndodaxAPI class dengan caching dan retry logic
+- ✅ Perbaikan bug notifikasi Moon/Crash
+- ✅ Fix candlestick chart dengan timestamp milidetik
+- ✅ Perbaikan query StochRSI dengan simbol uppercase
+- ✅ Validasi data yang lebih ketat
+- ✅ Error handling dan logging yang comprehensive
+- ✅ Update config format dari array ke constants
+
+### v3.0.0 (2024) - Binance API Migration
+- 🔄 Migrasi dari Indodax API ke Binance API
+- ✅ Refactored ke full OOP architecture
+- ✅ Implementasi comprehensive technical indicators
 
 ### v2.0.0 (2024)
 - ✅ Initial OOP refactoring
 - ✅ Basic caching implementation
-- ✅ Support for environment variables
 
 ### v1.0.0
-- 🎉 Initial release with Indodax API
+- 🎉 Initial release dengan Indodax API
 - 📊 Basic price monitoring
-- 📈 Chart generation
-- 🔔 Moon/Crash notifications
 
 ---
 
@@ -297,7 +319,15 @@ Kontribusi selalu diterima! Untuk perubahan besar:
 
 ## 📄 License
 
-Distributed under the MIT License.  See `LICENSE` for more information.
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+## 🙏 Acknowledgments
+
+- [Indodax](https://indodax.com) - Indonesian Cryptocurrency Exchange
+- [QuickChart.io](https://quickchart.io) - Chart generation API
+- [Telegram Bot API](https://core.telegram.org/bots/api) - Bot platform
 
 ---
 
@@ -306,7 +336,6 @@ Distributed under the MIT License.  See `LICENSE` for more information.
 </p>
 
 <p align="center">
-  <a href="https://t.me/your_bot">🤖 Try the Bot</a> •
   <a href="https://github.com/FauzanIndarwan/CryptoTelegramBot/issues">🐛 Report Bug</a> •
   <a href="https://github.com/FauzanIndarwan/CryptoTelegramBot/issues">💡 Request Feature</a>
 </p>

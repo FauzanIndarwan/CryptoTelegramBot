@@ -8,68 +8,19 @@
  * For production, use environment variables instead of hardcoded values.
  */
 
-return [
-    // Telegram Bot Configuration
-    'telegram' => [
-        'bot_token' => getenv('BOT_TOKEN') ?: 'YOUR_TELEGRAM_BOT_TOKEN_HERE',
-        'chat_id_notifikasi' => getenv('CHAT_ID_NOTIFIKASI') ?: 'YOUR_NOTIFICATION_CHAT_ID',
-    ],
+// TELEGRAM
+define('BOT_TOKEN', getenv('BOT_TOKEN') ?: 'YOUR_BOT_TOKEN_HERE');
+define('CHAT_ID_NOTIFIKASI', getenv('CHAT_ID_NOTIFIKASI') ?: 'YOUR_CHAT_ID');
 
-    // Database Configuration
-    'database' => [
-        'host' => getenv('DB_HOST') ?: 'localhost',
-        'user' => getenv('DB_USER') ?: 'your_database_user',
-        'password' => getenv('DB_PASS') ?: 'your_database_password',
-        'name' => getenv('DB_NAME') ?: 'crypto_bot',
-        'charset' => 'utf8mb4',
-    ],
+// DATABASE
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+define('DB_USER', getenv('DB_USER') ?: 'your_db_user');
+define('DB_PASS', getenv('DB_PASS') ?: 'your_db_pass');
+define('DB_NAME', getenv('DB_NAME') ?: 'your_db_name');
 
-    // Binance API Configuration
-    'binance' => [
-        'base_url' => 'https://api.binance.com',
-        'api_key' => getenv('BINANCE_API_KEY') ?: '', // Optional for public endpoints
-        'api_secret' => getenv('BINANCE_API_SECRET') ?: '', // Optional for public endpoints
-        'cache_duration' => 60, // Cache duration in seconds
-    ],
-
-    // Cron Security
-    'cron' => [
-        'secret_key' => getenv('CRON_KEY') ?: 'your_secret_cron_key_here',
-    ],
-
-    // Application Settings
-    'app' => [
-        'timezone' => 'Asia/Jakarta',
-        'debug' => false,
-        'log_errors' => true,
-        'log_file' => __DIR__ . '/logs/app.log',
-    ],
-
-    // Worker Settings
-    'worker' => [
-        'batch_size' => 5, // Number of jobs to process in one batch
-        'max_retries' => 3, // Maximum number of retry attempts
-        'retry_delay' => 5, // Delay between retries in seconds
-    ],
-
-    // Chart Settings
-    'chart' => [
-        'default_interval' => '5m',
-        'default_limit' => 100,
-        'candlestick_days' => 30,
-    ],
-
-    // Market Monitoring
-    'monitoring' => [
-        'price_change_threshold' => 5.0, // Percentage change for moon/crash alerts
-        'stochrsi_period' => 14,
-        'stochrsi_smooth_k' => 3,
-        'stochrsi_smooth_d' => 3,
-    ],
-
-    // Supported Trading Pairs
-    'pairs' => [
-        'default_quote' => 'USDT',
-        'supported_bases' => ['BTC', 'ETH', 'BNB', 'XRP', 'ADA', 'DOGE', 'SOL', 'MATIC', 'DOT', 'AVAX'],
-    ],
-];
+// BOT SETTINGS
+define('KUNCI_RAHASIA_CRON', getenv('CRON_KEY') ?: 'your_secret_cron_key');
+define('AMBANG_BATAS_PERSENTASE', 5);
+define('STOCH_RSI_OVERSOLD', 20);
+define('STOCH_RSI_OVERBOUGHT', 80);
+define('STOCH_RSI_PERIODE', 14);
